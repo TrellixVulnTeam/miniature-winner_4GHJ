@@ -15,6 +15,33 @@ from PRNet.utils.cv_plot import plot_kpt, plot_vertices
 import time
 import numpy as np
 import pymesh
+import threading
+from Queue import Queue
+
+
+q = Queue()
+def worker():
+    while True:
+        item = q.get()
+        image = np.zeros((frame_height, frame_width))
+        if item is not None:
+            vertices = item
+            show_img = plot_vertices(np.zeros_like(image), vertices)
+        else:
+            show_img = image 
+                # Display the resulting frame
+#        cv2.imshow('frame',show_img)
+
+        # Press Q on keyboard to stop recording
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break 
+        q.task_done()
+
+t = threading.Thread(target=worker)
+t.daemon = True
+t.start()
+
+
 
 channel = grpc.insecure_channel('0.0.0.0:8500')
 stub = prediction_service_pb2_grpc.PredictionServiceStub(channel)
@@ -45,12 +72,16 @@ while frame_num:
         # depth_out = cv2.VideoWriter('output_depth.avi', cv2.VideoWriter_fourcc(
         #     'M', 'J', 'P', 'G'), 24, (frame_width, frame_height))
 
+    pp_start_time = time.time()
+    start_time = time.time()
     next_request = predict_pb2.PredictRequest()
     next_request.inputs['input_image'].CopyFrom(
       tf.make_tensor_proto(image))
+    elapsed_time = time.time() - start_time
+    print('serialization time cost: {}'.format(elapsed_time))
 
-    face_detector = FaceDetector()
     start_time = time.time()
+    face_detector = FaceDetector()
     face_detector.PreProcess(next_request, stub)
     face_detector.Apply()
     prnet_request = face_detector.PostProcess()
@@ -66,21 +97,42 @@ while frame_num:
         elapsed_time = time.time() - start_time
         print('prnet_image_cropper time cost: {}'.format(elapsed_time))
 
-        prn = PRNet()
         start_time = time.time()
+        prn = PRNet()
         prn.PreProcess(next_request, stub)
         prn.Apply()
         final_request = prn.PostProcess();
         elapsed_time = time.time() - start_time
         print('prnet time cost: {}'.format(elapsed_time))
 
+        start_time = time.time()
         kpt = tensor_util.MakeNdarray(final_request.inputs["prnet_output"])
         vertices = tensor_util.MakeNdarray(final_request.inputs["vertices"])
+        print(vertices.shape)
 
-        start_time = time.time()
-        out.write(plot_vertices(np.zeros_like(image), vertices))
+        q.put(vertices)
+
+#        show_img = plot_vertices(np.zeros_like(image), vertices)
+
+#        show_img = image
         elapsed_time = time.time() - start_time
-
+        print('plot vertices time cost: {}'.format(elapsed_time))
     else:
-        out.write(image)
+        q.put(None)
+        # Display the resulting frame    
+#    cv2.imshow('frame',show_img)
+         
+        # Press Q on keyboard to stop recording
+#    if cv2.waitKey(1) & 0xFF == ord('q'):
+#        break
 
+    pp_elapse = time.time() - pp_start_time
+    print('fps = {}'.format(1/pp_elapse))
+        #start_time = time.time()
+        #out.write(plot_vertices(np.zeros_like(image), vertices))
+        #elapsed_time = time.time() - start_time
+
+    #else:
+        #out.write(image)
+
+q.join()       # block until all tasks are done
