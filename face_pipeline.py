@@ -19,22 +19,16 @@ import threading
 from Queue import Queue
 
 
+visualize_channel = grpc.insecure_channel("0.0.0.0:50051")
+visualize_stub = prediction_service_pb2_grpc.PredictionServiceStub(visualize_channel)
+
+
 q = Queue()
 def worker():
     while True:
         item = q.get()
-        image = np.zeros((frame_height, frame_width))
-        if item is not None:
-            vertices = item
-            show_img = plot_vertices(np.zeros_like(image), vertices)
-        else:
-            show_img = image 
-                # Display the resulting frame
-#        cv2.imshow('frame',show_img)
+        result = visualize_stub.Predict(item, 10.0)
 
-        # Press Q on keyboard to stop recording
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break 
         q.task_done()
 
 t = threading.Thread(target=worker)
@@ -43,7 +37,9 @@ t.start()
 
 
 
-channel = grpc.insecure_channel('0.0.0.0:8500')
+# channel = grpc.insecure_channel('0.0.0.0:8500')
+channel = grpc.insecure_channel('204.57.7.38:8500')
+
 stub = prediction_service_pb2_grpc.PredictionServiceStub(channel)
 
 # Setup
@@ -52,7 +48,8 @@ FaceDetector.Setup()
 PRNetImageCropper.Setup()
 
 
-cap = cv2.VideoCapture("./tensorflow_face_detection/media/test.mp4")
+# cap = cv2.VideoCapture("./tensorflow_face_detection/media/test.mp4")
+cap = cv2.VideoCapture(0)
 frame_width = int(cap.get(3))
 frame_height = int(cap.get(4))
 
@@ -61,9 +58,13 @@ out = None
 depth_out = None
 frame_num = 1490
 ind = 0
-while frame_num:
+read_time = -1
+while True:
     frame_num -= 1
     ret, image = cap.read()
+    if time.time() - read_time < 1.0/24:
+        continue
+    read_time = time.time()
     if ret == 0:
         break
     if out is None:
@@ -71,7 +72,7 @@ while frame_num:
             'M', 'J', 'P', 'G'), 24, (frame_width, frame_height))
         # depth_out = cv2.VideoWriter('output_depth.avi', cv2.VideoWriter_fourcc(
         #     'M', 'J', 'P', 'G'), 24, (frame_width, frame_height))
-
+    print("frame_width {}, frame_height {}".format(frame_width, frame_height))
     pp_start_time = time.time()
     start_time = time.time()
     next_request = predict_pb2.PredictRequest()
@@ -110,15 +111,13 @@ while frame_num:
         vertices = tensor_util.MakeNdarray(final_request.inputs["vertices"])
         print(vertices.shape)
 
-        q.put(vertices)
+        q.put(final_request)
 
 #        show_img = plot_vertices(np.zeros_like(image), vertices)
 
 #        show_img = image
         elapsed_time = time.time() - start_time
         print('plot vertices time cost: {}'.format(elapsed_time))
-    else:
-        q.put(None)
         # Display the resulting frame    
 #    cv2.imshow('frame',show_img)
          

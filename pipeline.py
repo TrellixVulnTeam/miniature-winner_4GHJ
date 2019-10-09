@@ -25,9 +25,9 @@ def timeit_context(name):
     print('[{}] finished in {} ms'.format(name, int(elapsedTime * 1000)))
 
 
-# Initialize and setup all modules
-taco = Tacotron_de()
-taco.Setup()
+# # Initialize and setup all modules
+# taco = Tacotron_de()
+# taco.Setup()
 
 
 # ============ Speech Recognition Modules ============
@@ -40,7 +40,7 @@ jasper.Setup()
 wave2letter = Wave2Letter()
 wave2letter.Setup()
 
-speech_recognition = wave2letter
+speech_recognition = deepspeech
 # ============ Speech Recognition Modules ============
 
 resample = Resample()
@@ -67,7 +67,8 @@ decoder.Setup()
 
 # Input
 # Input
-input_audio, sr = librosa.load('/home/oscar/sdb3/data/Librispeech/LibriSpeech/test-clean-wav/1320-122617-0012.wav')
+input_audio, sr = librosa.load('test.wav')
+print(sr)
 
 wav = input_audio
 
@@ -92,13 +93,13 @@ decoded_text = decoder.Apply(post)
 print("Translation")
 print(decoded_text)
 
-text = decoded_text.encode("utf-8")
+# text = decoded_text.encode("utf-8")
 
-# Speech synthesis module
-pre = taco.PreProcess([text])
-app = taco.Apply(pre)
-post = taco.PostProcess(*app)
+# # Speech synthesis module
+# pre = taco.PreProcess([text])
+# app = taco.Apply(pre)
+# post = taco.PostProcess(*app)
 
-wav = save_audio(post, "unused", "unused", sampling_rate=16000, save_format="np.array", n_fft=800)
+# wav = save_audio(post, "unused", "unused", sampling_rate=16000, save_format="np.array", n_fft=800)
 # This part is out of the pipeline, just for debug purpose
 
