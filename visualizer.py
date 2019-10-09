@@ -22,7 +22,7 @@ import pyaudio
 p = pyaudio.PyAudio()
 
 stream = p.open(format=pyaudio.paInt16,
-                channels=2,
+                channels=1,
                 rate=22500,
                 output=True)
 
@@ -33,8 +33,12 @@ fontScale              = 1
 fontColor              = (255,255,255)
 lineType               = 2
 
+
+subtitles = Queue()
+
 q = Queue()
 def worker():
+    display_subtitle = ""
     while True:
         item = q.get()
         image = np.zeros((480, 640))
@@ -45,7 +49,11 @@ def worker():
             show_img = image 
                 # Display the resulting frame
 
-        cv2.putText(show_img,'Hello World!', 
+        if not subtitles.empty():
+            text = subtitles.get()
+            subtitles.task_done()
+            display_subtitle = text
+        cv2.putText(show_img,display_subtitle, 
             bottomLeftCornerOfText, 
             font, 
             fontScale,
@@ -78,6 +86,10 @@ class FakeServer(prediction_service_pb2_grpc.PredictionServiceServicer):
         print(type(request.inputs['audio'].string_val[0]))
         audio = request.inputs['audio'].string_val[0]
         stream.write(audio)
+    elif "subtitle" in request.inputs:
+        print('subtitle')
+        subtitles.put(request.inputs['subtitle'].string_val[0])
+
 
 
 
@@ -105,7 +117,8 @@ def serve():
     stream.close()
 
     p.terminate()
-    q.join()       # block until all tasks are done
+    q.join()       # block until all tasks are donet
+    subtitles.join()
 
 if __name__ == '__main__':
     logging.basicConfig()
