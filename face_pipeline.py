@@ -18,11 +18,11 @@ import pymesh
 import threading
 from Queue import Queue
 
-
-visualize_channel = grpc.insecure_channel("0.0.0.0:50051")
+# Set up visualizer channel
+visualize_channel = grpc.insecure_channel("10.136.105.130:50051")
 visualize_stub = prediction_service_pb2_grpc.PredictionServiceStub(visualize_channel)
 
-
+# Setup a worker to send visualization
 q = Queue()
 def worker():
     while True:
@@ -54,7 +54,6 @@ frame_width = int(cap.get(3))
 frame_height = int(cap.get(4))
 
 
-out = None
 depth_out = None
 frame_num = 1490
 ind = 0
@@ -62,16 +61,11 @@ read_time = -1
 while True:
     frame_num -= 1
     ret, image = cap.read()
-    if time.time() - read_time < 1.0/24:
+    if time.time() - read_time < 1.0/15:
         continue
     read_time = time.time()
     if ret == 0:
         break
-    if out is None:
-        out = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc(
-            'M', 'J', 'P', 'G'), 24, (frame_width, frame_height))
-        # depth_out = cv2.VideoWriter('output_depth.avi', cv2.VideoWriter_fourcc(
-        #     'M', 'J', 'P', 'G'), 24, (frame_width, frame_height))
     print("frame_width {}, frame_height {}".format(frame_width, frame_height))
     pp_start_time = time.time()
     start_time = time.time()
@@ -113,25 +107,11 @@ while True:
 
         q.put(final_request)
 
-#        show_img = plot_vertices(np.zeros_like(image), vertices)
-
-#        show_img = image
         elapsed_time = time.time() - start_time
         print('plot vertices time cost: {}'.format(elapsed_time))
-        # Display the resulting frame    
-#    cv2.imshow('frame',show_img)
-         
-        # Press Q on keyboard to stop recording
-#    if cv2.waitKey(1) & 0xFF == ord('q'):
-#        break
 
     pp_elapse = time.time() - pp_start_time
     print('fps = {}'.format(1/pp_elapse))
-        #start_time = time.time()
-        #out.write(plot_vertices(np.zeros_like(image), vertices))
-        #elapsed_time = time.time() - start_time
 
-    #else:
-        #out.write(image)
 
 q.join()       # block until all tasks are done
